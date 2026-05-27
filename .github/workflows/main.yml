@@ -11,8 +11,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm ci
+      - run: npm install
       - run: npx vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: team_ohnkck42WxZgazMwHmr3vs5T
           VERCEL_PROJECT_ID: prj_f2cEujnaGW1MsobsMEJcF48NypRh
+          NEXT_PUBLIC_SUPABASE_URL: https://xiwotydowokaxhjexfrz.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpd290eWRvd29rYXhoamV4ZnJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MDQ3MjksImV4cCI6MjA5NTM4MDcyOX0.xLpCUkhHNSY7Ek-LAvt3ldZyab6CJ4Ufxqycn5dGZvs
