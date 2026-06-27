@@ -3,47 +3,24 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --sidebar: #0D1B2A;
-  --sidebar-text: #8B9BB0;
-  --blue: #2563EB;
-  --blue-light: #EFF4FF;
-  --green: #16A34A;
-  --green-light: #DCFCE7;
-  --red: #DC2626;
-  --red-light: #FEF2F2;
-  --amber: #D97706;
-  --amber-light: #FFFBEB;
-  --border: #E5E9F2;
-  --bg: #F0F2F7;
-}
-
-body { font-family: 'DM Sans', sans-serif; background: var(--bg); }
-.mono { font-family: 'DM Mono', monospace; }
-
-.sidebar { background: var(--sidebar); }
-.nav-item { color: var(--sidebar-text); }
-.nav-item:hover { background: rgba(255,255,255,0.07); color: #e0e8f5; }
-.nav-item.active { background: rgba(37,99,235,0.25); color: #fff; }
-
-.card { background: #fff; border: 1px solid var(--border); border-radius: 12px; }
-
-.tag-paid { background: var(--green-light); color: var(--green); }
-.tag-pending { background: var(--amber-light); color: var(--amber); }
-.tag-overdue { background: var(--red-light); color: var(--red); }
-.tag-blue { background: var(--blue-light); color: var(--blue); }
-
-.amt-pos { color: var(--green); font-family: 'DM Mono', monospace; font-weight: 700; }
-.amt-neg { color: var(--red); font-family: 'DM Mono', monospace; font-weight: 700; }
-.amt-neu { font-family: 'DM Mono', monospace; font-weight: 700; }
-
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'DM Sans', sans-serif; background: #F0F2F7; margin: 0; }
 input, select, textarea {
-  width: 100%; padding: 9px 12px;
-  border: 1.5px solid var(--border);
-  border-radius: 6px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.15s;
+  width: 100%; padding: 10px 12px;
+  border: 1.5px solid #E5E9F2; border-radius: 8px;
+  font-family: 'DM Sans', sans-serif; font-size: 15px;
+  outline: none; transition: border-color 0.15s;
+  background: #fff; color: #0D1117;
+  -webkit-appearance: none; appearance: none;
 }
-input:focus, select:focus, textarea:focus { border-color: var(--blue); }
+input:focus, select:focus, textarea:focus { border-color: #2563EB; }
+button { font-family: 'DM Sans', sans-serif; }
+
+@media (max-width: 768px) {
+  .desktop-sidebar { display: none !important; }
+  .mobile-nav { display: block !important; }
+  .main-content { margin-left: 0 !important; padding-bottom: 70px !important; }
+}
+@media (min-width: 769px) {
+  .mobile-nav { display: none !important; }
+}
