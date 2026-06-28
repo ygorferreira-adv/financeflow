@@ -17,7 +17,7 @@ function getMonthOptions() {
 function getFutureMonths() {
   const opts = []
   const now = new Date()
-  for (let i = 0; i <= 5; i++) {
+  for (let i = -1; i <= 6; i++) {
     const d = new Date(now.getFullYear(), now.getMonth()+i, 1)
     opts.push({ value:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`, label:d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}) })
   }
@@ -33,7 +33,9 @@ export default function ReportsPage() {
   const curMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`
   const [tab, setTab] = useState<'month'|'future'>('month')
   const [selectedMonth, setSelectedMonth] = useState(curMonth)
-  const [futureMonth, setFutureMonth] = useState(curMonth)
+  // Próximo mês como padrão para contas futuras (onde estão as bills)
+  const nextMonth = (() => { const d = new Date(now.getFullYear(), now.getMonth()+1, 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01` })()
+  const [futureMonth, setFutureMonth] = useState(nextMonth)
   const [catData, setCatData] = useState<{name:string;total:number;count:number}[]>([])
   const [monthly, setMonthly] = useState<{month:string;label:string;despesas:number;receitas:number}[]>([])
   const [summary, setSummary] = useState({total_expense:0,total_income:0})
