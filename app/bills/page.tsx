@@ -31,6 +31,7 @@ export default function BillsPage() {
   const [categories, setCategories] = useState<{id:string;name:string}[]>([])
   const [form, setForm] = useState({ title:'',amount:'',due_date:'',category_id:'',recurrence:'once',status:'pending' })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string|null>(null)
   const [showStatusMenu, setShowStatusMenu] = useState<string|null>(null)
   const monthOpts = getMonthOptions()
@@ -57,28 +58,52 @@ export default function BillsPage() {
 
   function openNew() {
     setEditing(null)
+    setError('')
     setForm({ title:'',amount:'',due_date:'',category_id:'',recurrence:'once',status:'pending' })
     setShowModal(true)
   }
 
   function openEdit(b: Bill) {
     setEditing(b)
+    setError('')
     setForm({ title:b.title, amount:String(b.amount), due_date:b.due_date, category_id:b.category_id||'', recurrence:b.recurrence||'once', status:b.status })
     setShowModal(true)
   }
 
   async function save() {
-    if (!form.title || !form.amount || !form.due_date) return
+    setError('')
+    if (!form.title.trim()) { setError('Informe o nome da conta'); return }
+    if (!form.amount) { setError('Informe o valor'); return }
+    if (!form.due_date) { setError('Informe a data de vencimento'); return }
+    const amt = parseFloat(form.amount.replace(/\./g,'').replace(',','.'))
+    if (isNaN(amt) || amt <= 0) { setError('Valor inválido'); return }
     setSaving(true)
-    const { data:{ user } } = await supabase.auth.getUser()
-    if (!user) return
-    const payload = { title:form.title, amount:parseFloat(form.amount.replace(',','.')), due_date:form.due_date, status:form.status, category_id:form.category_id||null, recurrence:form.recurrence, payment_method:'pix' }
-    if (editing) {
-      await supabase.from('bills').update(payload).eq('id',editing.id)
-    } else {
-      await supabase.from('bills').insert({ ...payload, user_id:user.id })
+    try {
+      const { data:{ user } } = await supabase.auth.getUser()
+      if (!user) { setError('Sessão expirada'); setSaving(false); return }
+      const payload = {
+        title: form.title.trim(),
+        amount: amt,
+        due_date: form.due_date,
+        status: form.status,
+        category_id: form.category_id || null,
+        recurrence: form.recurrence,
+        payment_method: 'pix'
+      }
+      if (editing) {
+        const { error: err } = await supabase.from('bills').update(payload).eq('id',editing.id)
+        if (err) { setError('Erro ao salvar: ' + err.message); setSaving(false); return }
+      } else {
+        const { error: err } = await supabase.from('bills').insert({ ...payload, user_id:user.id })
+        if (err) { setError('Erro ao salvar: ' + err.message); setSaving(false); return }
+      }
+      setShowModal(false)
+      setError('')
+      load()
+    } catch(e: any) {
+      setError('Erro inesperado: ' + String(e?.message||e))
     }
-    setShowModal(false); setSaving(false); load()
+    setSaving(false)
   }
 
   async function deleteBill(id: string) {
@@ -95,23 +120,21 @@ export default function BillsPage() {
 
   const totalPending = bills.filter(b=>b.status!=='paid').reduce((a,b)=>a+b.amount,0)
   const statusInfo = (b: Bill) => {
-    const s = b.live_status === 'overdue' ? 'overdue' : b.status === 'paid' ? 'paid' : 'pending'
+    const s = b.live_status==='overdue'&&b.status!=='paid' ? 'overdue' : b.status==='paid' ? 'paid' : 'pending'
     return STATUS_OPTS.find(o=>o.v===s) || STATUS_OPTS[0]
   }
 
   return (
-    <div style={{ minHeight:'100vh', overflow:'hidden' }}>
-      {/* TOPBAR */}
+    <div style={{ minHeight:'100vh',overflow:'hidden' }} onClick={()=>showStatusMenu&&setShowStatusMenu(null)}>
       <div style={{ background:'#fff',borderBottom:'1px solid var(--border)',padding:'0 16px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:50 }}>
         <div>
           <div style={{ fontSize:15,fontWeight:700 }}>Contas a Pagar</div>
           <div style={{ fontSize:11,color:'var(--muted)' }}>Pendente: {formatBRL(totalPending)}</div>
         </div>
-        <button onClick={openNew} style={{ padding:'7px 14px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:600 }}>+ Nova</button>
+        <button onClick={openNew} style={{ padding:'7px 16px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer' }}>+ Nova Conta</button>
       </div>
 
       <div style={{ padding:'14px 16px' }}>
-        {/* Filtros */}
         <div style={{ display:'flex',gap:6,marginBottom:10,overflowX:'auto',paddingBottom:2 }}>
           <select value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} style={{ width:'auto',padding:'5px 8px',fontSize:12,fontWeight:600,borderRadius:8,border:'1.5px solid var(--border)',background:'#F8FAFC',flexShrink:0 }}>
             {monthOpts.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
@@ -121,12 +144,11 @@ export default function BillsPage() {
           ))}
         </div>
 
-        {/* Lista */}
         {bills.length === 0 ? (
           <div style={{ textAlign:'center',padding:'48px 20px',color:'var(--muted)' }}>
             <div style={{ fontSize:36,marginBottom:10 }}>🎉</div>
             <div style={{ fontWeight:600,marginBottom:12 }}>Nenhuma conta aqui</div>
-            <button onClick={openNew} style={{ padding:'8px 20px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600 }}>+ Adicionar conta</button>
+            <button onClick={openNew} style={{ padding:'8px 20px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer' }}>+ Adicionar conta</button>
           </div>
         ) : (
           <div style={{ background:'#fff',border:'1px solid var(--border)',borderRadius:12,overflow:'hidden' }}>
@@ -143,20 +165,15 @@ export default function BillsPage() {
                         {b.recurrence==='monthly'&&<span style={{ marginLeft:6,fontSize:10,background:'#EFF6FF',color:'var(--accent)',padding:'1px 5px',borderRadius:8,fontWeight:600 }}>Mensal</span>}
                       </div>
                     </div>
-                    <div style={{ textAlign:'right',flexShrink:0 }}>
-                      <div style={{ fontSize:14,fontWeight:800,fontFamily:'JetBrains Mono,monospace',color:isOverdue?'var(--danger)':b.status==='paid'?'var(--success)':'var(--text)',letterSpacing:'-0.5px' }}>{formatBRL(b.amount)}</div>
-                    </div>
+                    <div style={{ fontSize:14,fontWeight:800,fontFamily:'JetBrains Mono,monospace',color:isOverdue?'var(--danger)':b.status==='paid'?'var(--success)':'var(--text)',letterSpacing:'-0.5px',flexShrink:0 }}>{formatBRL(b.amount)}</div>
                   </div>
-
-                  {/* Ações */}
-                  <div style={{ display:'flex',gap:6,marginTop:10,flexWrap:'wrap' }}>
-                    {/* Status badge + menu */}
+                  <div style={{ display:'flex',gap:6,marginTop:10,flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
                     <div style={{ position:'relative' }}>
-                      <button onClick={()=>setShowStatusMenu(showStatusMenu===b.id?null:b.id)} style={{ padding:'4px 10px',background:si.bg,color:si.color,border:`1px solid ${si.color}33`,borderRadius:20,fontSize:11,fontWeight:700,display:'flex',alignItems:'center',gap:4 }}>
+                      <button onClick={()=>setShowStatusMenu(showStatusMenu===b.id?null:b.id)} style={{ padding:'4px 10px',background:si.bg,color:si.color,border:`1px solid ${si.color}33`,borderRadius:20,fontSize:11,fontWeight:700,cursor:'pointer' }}>
                         {si.l} ▾
                       </button>
                       {showStatusMenu===b.id && (
-                        <div style={{ position:'absolute',top:'100%',left:0,marginTop:4,background:'#fff',border:'1px solid var(--border)',borderRadius:10,boxShadow:'var(--shadow-md)',zIndex:100,minWidth:130,overflow:'hidden' }}>
+                        <div style={{ position:'absolute',top:'calc(100% + 4px)',left:0,background:'#fff',border:'1px solid var(--border)',borderRadius:10,boxShadow:'var(--shadow-md)',zIndex:100,minWidth:140,overflow:'hidden' }}>
                           {STATUS_OPTS.map(o=>(
                             <button key={o.v} onClick={()=>changeStatus(b.id,o.v)} style={{ display:'block',width:'100%',textAlign:'left',padding:'9px 14px',background:b.status===o.v?o.bg:'#fff',color:o.color,border:'none',fontSize:12,fontWeight:600,cursor:'pointer',borderBottom:'1px solid #F8FAFC' }}>
                               {b.status===o.v?'✓ ':''}{o.l}
@@ -165,9 +182,8 @@ export default function BillsPage() {
                         </div>
                       )}
                     </div>
-
-                    <button onClick={()=>openEdit(b)} style={{ padding:'4px 10px',background:'#F1F5F9',color:'#475569',border:'1px solid var(--border)',borderRadius:20,fontSize:11,fontWeight:600 }}>✏ Editar</button>
-                    <button onClick={()=>deleteBill(b.id)} disabled={deleting===b.id} style={{ padding:'4px 10px',background:'var(--danger-light)',color:'var(--danger)',border:'1px solid #FECACA',borderRadius:20,fontSize:11,fontWeight:600 }}>{deleting===b.id?'…':'🗑 Excluir'}</button>
+                    <button onClick={()=>openEdit(b)} style={{ padding:'4px 10px',background:'#F1F5F9',color:'#475569',border:'1px solid var(--border)',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer' }}>✏ Editar</button>
+                    <button onClick={()=>deleteBill(b.id)} disabled={deleting===b.id} style={{ padding:'4px 10px',background:'var(--danger-light)',color:'var(--danger)',border:'1px solid #FECACA',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer' }}>{deleting===b.id?'…':'🗑 Excluir'}</button>
                   </div>
                 </div>
               )
@@ -178,48 +194,68 @@ export default function BillsPage() {
 
       {/* MODAL */}
       {showModal && (
-        <div onClick={e=>{ if(e.target===e.currentTarget){setShowModal(false);setShowStatusMenu(null)} }} style={{ position:'fixed',inset:0,background:'rgba(15,23,42,.5)',zIndex:200,display:'flex',alignItems:'flex-end',justifyContent:'center' }}>
-          <div style={{ background:'#fff',borderRadius:'16px 16px 0 0',width:'100%',maxWidth:540,padding:'20px 16px 32px',maxHeight:'92vh',overflowY:'auto' }}>
+        <div onClick={e=>{ if(e.target===e.currentTarget){ setShowModal(false); setError('') }}} style={{ position:'fixed',inset:0,background:'rgba(15,23,42,.5)',zIndex:200,display:'flex',alignItems:'flex-end',justifyContent:'center' }}>
+          <div style={{ background:'#fff',borderRadius:'16px 16px 0 0',width:'100%',maxWidth:540,padding:'20px 16px 32px',maxHeight:'92vh',overflowY:'auto' }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16 }}>
               <div style={{ fontSize:15,fontWeight:700 }}>{editing?'Editar Conta':'Nova Conta a Pagar'}</div>
-              <button onClick={()=>setShowModal(false)} style={{ background:'#F1F5F9',border:'none',borderRadius:8,width:28,height:28,fontSize:14,color:'var(--muted)' }}>✕</button>
+              <button onClick={()=>{ setShowModal(false); setError('') }} style={{ background:'#F1F5F9',border:'none',borderRadius:8,width:30,height:30,fontSize:16,cursor:'pointer',color:'var(--muted)' }}>✕</button>
             </div>
-            <FG label="Nome"><input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Ex: Aluguel, Energia..."/></FG>
-            <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
-              <FG label="Valor"><input value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0,00" inputMode="decimal"/></FG>
-              <FG label="Vencimento"><input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))}/></FG>
+
+            {error && (
+              <div style={{ marginBottom:12,padding:'10px 14px',background:'var(--danger-light)',border:'1px solid #FECACA',borderRadius:8,fontSize:12,fontWeight:600,color:'var(--danger)' }}>
+                ⚠ {error}
+              </div>
+            )}
+
+            <div style={{ marginBottom:12 }}>
+              <label style={{ display:'block',fontSize:11,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.5px' }}>Nome da Conta *</label>
+              <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Ex: Aluguel, Energia, Internet..." autoFocus/>
             </div>
-            <FG label="Status">
+
+            <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12 }}>
+              <div>
+                <label style={{ display:'block',fontSize:11,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.5px' }}>Valor *</label>
+                <input value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0,00" inputMode="decimal"/>
+              </div>
+              <div>
+                <label style={{ display:'block',fontSize:11,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.5px' }}>Vencimento *</label>
+                <input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))}/>
+              </div>
+            </div>
+
+            <div style={{ marginBottom:12 }}>
+              <label style={{ display:'block',fontSize:11,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.5px' }}>Status</label>
               <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
                 {STATUS_OPTS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
-            </FG>
-            <FG label="Categoria">
+            </div>
+
+            <div style={{ marginBottom:12 }}>
+              <label style={{ display:'block',fontSize:11,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.5px' }}>Categoria</label>
               <select value={form.category_id} onChange={e=>setForm(f=>({...f,category_id:e.target.value}))}>
                 <option value="">Selecionar...</option>
                 {categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-            </FG>
-            <FG label="Recorrência">
+            </div>
+
+            <div style={{ marginBottom:20 }}>
+              <label style={{ display:'block',fontSize:11,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.5px' }}>Recorrência</label>
               <select value={form.recurrence} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))}>
-                <option value="once">Única vez</option><option value="monthly">Mensal</option><option value="yearly">Anual</option>
+                <option value="once">Única vez</option>
+                <option value="monthly">Mensal</option>
+                <option value="yearly">Anual</option>
               </select>
-            </FG>
-            <div style={{ display:'flex',gap:8,marginTop:8 }}>
-              <button onClick={()=>setShowModal(false)} style={{ flex:1,padding:11,border:'1.5px solid var(--border)',borderRadius:8,background:'#fff',fontSize:13,fontWeight:600,color:'var(--muted)' }}>Cancelar</button>
-              <button onClick={save} disabled={saving} style={{ flex:2,padding:11,background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,opacity:saving?0.7:1 }}>{saving?'Salvando...':editing?'Salvar Alterações':'Adicionar Conta'}</button>
+            </div>
+
+            <div style={{ display:'flex',gap:10 }}>
+              <button onClick={()=>{ setShowModal(false); setError('') }} style={{ flex:1,padding:13,border:'1.5px solid var(--border)',borderRadius:10,background:'#fff',fontSize:14,fontWeight:600,color:'var(--muted)',cursor:'pointer' }}>Cancelar</button>
+              <button onClick={save} disabled={saving} style={{ flex:2,padding:13,background:saving?'#93C5FD':'var(--accent)',color:'#fff',border:'none',borderRadius:10,fontSize:14,fontWeight:700,cursor:saving?'not-allowed':'pointer',transition:'background .15s' }}>
+                {saving?'Salvando...':editing?'Salvar Alterações':'✓ Adicionar Conta'}
+              </button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  )
-}
-function FG({ label, children }: { label: string, children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom:12 }}>
-      <label style={{ display:'block',fontSize:11,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.5px' }}>{label}</label>
-      {children}
     </div>
   )
 }
