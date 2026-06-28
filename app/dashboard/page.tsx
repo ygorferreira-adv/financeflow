@@ -43,22 +43,28 @@ export default function Dashboard() {
     const mDate = new Date(selectedMonth)
     const mStart = `${mDate.getFullYear()}-${String(mDate.getMonth()+1).padStart(2,'0')}-01`
     const mEnd = new Date(mDate.getFullYear(), mDate.getMonth()+1, 0).toISOString().split('T')[0]
-    const [{data:s},{data:bl},{data:tx},{data:cats}] = await Promise.all([
-      supabase.rpc('get_dashboard_summary',{p_user_id:uid,p_month:mStart}),
+    const [{data:bl},{data:tx},{data:cats},{data:allTx}] = await Promise.all([
       supabase.from('bills_live').select('*').eq('user_id',uid).gte('due_date',mStart).lte('due_date',mEnd).neq('status','cancelled').order('due_date'),
       supabase.from('transactions').select('*,categories(name)').eq('user_id',uid).gte('transaction_date',mStart).lte('transaction_date',mEnd).order('transaction_date',{ascending:false}).limit(8),
       supabase.from('categories').select('id,name').or(`user_id.eq.${uid},user_id.is.null`).order('name'),
+      supabase.from('transactions').select('amount,type').eq('user_id',uid).eq('status','confirmed').gte('transaction_date',mStart).lte('transaction_date',mEnd),
     ])
-    setSummary(s||{total_expense:0,total_income:0,bills_pending:0,bills_overdue:0,bills_overdue_count:0})
+    const totalExp=(allTx||[]).filter((t:any)=>t.type==='expense').reduce((a:number,t:any)=>a+Number(t.amount),0)
+    const totalInc=(allTx||[]).filter((t:any)=>t.type==='income').reduce((a:number,t:any)=>a+Number(t.amount),0)
+    const s={total_expense:totalExp,total_income:totalInc,bills_pending:0,bills_overdue:0,bills_overdue_count:0}
+    setSummary(s)
     setBills(bl||[])
     setTransactions(tx||[])
     setCategories(cats||[])
     const months=[]
     for (let i=5;i>=0;i--) {
       const d=new Date(); d.setMonth(d.getMonth()-i)
-      const m=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
-      const {data:ms}=await supabase.from('monthly_summary').select('total_expense,total_income').eq('user_id',uid).eq('month',m).single()
-      months.push({month:d.toLocaleDateString('pt-BR',{month:'short'}),despesas:ms?.total_expense||0,receitas:ms?.total_income||0})
+      const mS=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
+      const mE=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().split('T')[0]
+      const {data:mt}=await supabase.from('transactions').select('amount,type').eq('user_id',uid).eq('status','confirmed').gte('transaction_date',mS).lte('transaction_date',mE)
+      const exp=(mt||[]).filter((t:any)=>t.type==='expense').reduce((a:number,t:any)=>a+t.amount,0)
+      const inc=(mt||[]).filter((t:any)=>t.type==='income').reduce((a:number,t:any)=>a+t.amount,0)
+      months.push({month:d.toLocaleDateString('pt-BR',{month:'short'}),despesas:exp,receitas:inc})
     }
     setMonthly(months)
     setLoading(false)
