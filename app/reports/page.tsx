@@ -26,7 +26,7 @@ function getFutureMonths() {
 
 const COLORS = ['#1D4ED8','#7C3AED','#DC2626','#D97706','#16A34A','#0891B2','#9333EA','#C2410C','#0F766E','#6B7280']
 
-interface Bill { id:string;title:string;amount:number;due_date:string;status:string;category_name:string;recurrence:string }
+interface Bill { id:string;title:string;amount:number;due_date:string;status:string;live_status:string;category_name:string;recurrence:string }
 
 export default function ReportsPage() {
   const now = new Date()
