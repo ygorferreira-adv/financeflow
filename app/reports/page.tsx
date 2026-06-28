@@ -51,7 +51,7 @@ export default function ReportsPage() {
     // Buscar transações diretamente (mais confiável que a view)
     const mEnd = new Date(mDate.getFullYear(), mDate.getMonth()+1, 0).toISOString().split('T')[0]
     const {data:txs} = await supabase.from('transactions')
-      .select('amount,type,categories(name)')
+      .select('amount,type,categories!left(name)')
       .eq('user_id',user.id)
       .eq('status','confirmed')
       .gte('transaction_date',mStart)
@@ -64,7 +64,7 @@ export default function ReportsPage() {
     // Categorias
     const catMap: Record<string,{total:number,count:number}> = {}
     ;(txs||[]).filter(t=>t.type==='expense').forEach(t=>{
-      const name = (t.categories as {name:string}|null)?.name || 'Outros'
+      const name = ((t as any).categories?.name) || 'Outros'
       if (!catMap[name]) catMap[name]={total:0,count:0}
       catMap[name].total += t.amount
       catMap[name].count += 1
